@@ -1,0 +1,174 @@
+{
+  "chatbot_config": {
+    "name": "NeighbourBot",
+    "purpose": "Assist users with neighbourhood-based queries, posts, alerts, marketplace, and business listings.",
+    "embedding": {
+      "type": "iframe",
+      "height": "600px",
+      "width": "100%",
+      "theme": "light",
+      "welcome_message": "Welcome to your neighbourhood assistant. Ask anything about your area."
+    },
+    "context_management": {
+      "session_memory": true,
+      "store_neighbourhood": true,
+      "store_user_intent": true
+    },
+    "authentication": {
+      "jwt_required": true,
+      "api_base": "/api/v1",
+      "headers": {
+        "Authorization": "Bearer {{user_jwt}}"
+      }
+    },
+    "intents": [
+      {
+        "name": "get_recent_posts",
+        "triggers": ["recent posts", "what's happening", "updates", "show posts"],
+        "action": {
+          "endpoint": "/posts?neighbourhood_id={{neighbourhood_id}}",
+          "method": "GET"
+        }
+      },
+      {
+        "name": "get_alerts",
+        "triggers": ["alerts", "warnings", "urgent"],
+        "action": {
+          "endpoint": "/posts?neighbourhood_id={{neighbourhood_id}}&type=alert",
+          "method": "GET"
+        }
+      },
+      {
+        "name": "create_post",
+        "triggers": ["create post", "post:", "share:", "write"],
+        "confirmation": true,
+        "action": {
+          "endpoint": "/posts",
+          "method": "POST",
+          "body_template": {
+            "content": "{{content}}",
+            "type": "post",
+            "neighbourhood_id": "{{neighbourhood_id}}"
+          }
+        }
+      },
+      {
+        "name": "create_alert",
+        "triggers": ["alert:", "urgent:", "warning:"],
+        "confirmation": true,
+        "action": {
+          "endpoint": "/posts",
+          "method": "POST",
+          "body_template": {
+            "content": "{{content}}",
+            "type": "alert",
+            "neighbourhood_id": "{{neighbourhood_id}}"
+          }
+        }
+      },
+      {
+        "name": "comment_on_post",
+        "triggers": ["comment on post", "reply to"],
+        "entities_required": ["post_id", "comment"],
+        "action": {
+          "endpoint": "/comments",
+          "method": "POST",
+          "body_template": {
+            "post_id": "{{post_id}}",
+            "content": "{{comment}}"
+          }
+        }
+      },
+      {
+        "name": "search_marketplace",
+        "triggers": ["search item", "find", "marketplace"],
+        "action": {
+          "endpoint": "/marketplace/search?query={{query}}&neighbourhood_id={{neighbourhood_id}}",
+          "method": "GET"
+        }
+      },
+      {
+        "name": "create_market_item",
+        "triggers": ["list item", "sell"],
+        "entities_required": ["title", "price"],
+        "action": {
+          "endpoint": "/marketplace",
+          "method": "POST",
+          "body_template": {
+            "title": "{{title}}",
+            "price": "{{price}}",
+            "neighbourhood_id": "{{neighbourhood_id}}",
+            "status": "available"
+          }
+        }
+      },
+      {
+        "name": "search_businesses",
+        "triggers": ["business near", "restaurants", "shops"],
+        "action": {
+          "endpoint": "/businesses?category={{query}}&neighbourhood_id={{neighbourhood_id}}",
+          "method": "GET"
+        }
+      },
+      {
+        "name": "get_notifications",
+        "triggers": ["notifications", "alerts for me"],
+        "action": {
+          "endpoint": "/notifications",
+          "method": "GET"
+        }
+      },
+      {
+        "name": "update_neighbourhood",
+        "triggers": ["change neighbourhood", "update location"],
+        "entities_required": ["neighbourhood_id"],
+        "action": {
+          "endpoint": "/users/neighbourhood",
+          "method": "POST",
+          "body_template": {
+            "neighbourhood_id": "{{neighbourhood_id}}"
+          }
+        }
+      }
+    ],
+    "responses": {
+      "success": "{{message}}",
+      "error": "Request failed. Try again or rephrase."
+    },
+    "fallback": {
+      "message": "I understand neighbourhood posts, alerts, marketplace, businesses, and profiles. Try asking something related.",
+      "suggestions": [
+        "Show recent posts",
+        "Find businesses near me",
+        "Search marketplace",
+        "Post an alert about crime"
+      ]
+    }
+  },
+  "ui_style": {
+    "theme": "light",
+    "colors": {
+      "background": "#ffffff",
+      "text": "#000000",
+      "accent": "#000000",
+      "border": "#e5e5e5",
+      "input_background": "#f7f7f7"
+    },
+    "font": {
+      "family": "Inter, Arial, sans-serif",
+      "size": "14px"
+    },
+    "animations": {
+      "enable": true,
+      "entrance": "fade-in",
+      "transition_speed": "200ms",
+      "hover": "scale-up"
+    },
+    "layout": {
+      "rounded_corners": "12px",
+      "shadow": "0 2px 6px rgba(0,0,0,0.08)",
+      "max_width": "420px"
+    }
+  }
+}
+

@@ -1,6 +1,7 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useUserStore } from '../store/useUserStore'
 import { supabase } from '../lib/supabaseClient'
+import ChatbotWidget from './ChatbotWidget'
 
 export default function Layout() {
   const navigate = useNavigate()
@@ -16,6 +17,8 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-white">
       <Outlet />
+      
+      <ChatbotWidget />
       
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-black">
         <div className="max-w-2xl mx-auto flex justify-around items-center h-16">
