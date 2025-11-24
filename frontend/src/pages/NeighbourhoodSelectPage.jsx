@@ -13,7 +13,7 @@ export default function NeighbourhoodSelectPage() {
   const [showManualInput, setShowManualInput] = useState(false)
   const [locationError, setLocationError] = useState('')
   const navigate = useNavigate()
-  const { user, setNeighbourhood, session } = useUserStore()
+  const { user, setNeighbourhood, setUser, setSession, session } = useUserStore()
 
   useEffect(() => {
     fetchNeighbourhoods()
@@ -184,14 +184,17 @@ export default function NeighbourhoodSelectPage() {
 
   const selectNeighbourhood = async (neighbourhood) => {
     try {
-      // In dev mode, skip Supabase update
-      if (user?.id?.startsWith('dev-user-')) {
+      // DEV MODE: Bypass API call and directly set neighbourhood
+      const isDevMode = user?.id?.startsWith('dev-user-') || neighbourhood?.id?.startsWith('dev-neighbourhood-')
+      
+      if (isDevMode) {
+        console.log('🔧 DEV MODE: Bypassing API call, setting neighbourhood directly')
         setNeighbourhood(neighbourhood)
         navigate('/')
         return
       }
 
-      // Update user's neighbourhood via backend API
+      // PRODUCTION: Update user's neighbourhood via backend API
       const session = useUserStore.getState().session
       const accessToken = session?.access_token || user?.session?.access_token
       
@@ -229,6 +232,30 @@ export default function NeighbourhoodSelectPage() {
     )
   }
 
+  const handleDevMode = () => {
+    // Create dev user if not exists
+    if (!user || !user.id?.startsWith('dev-user-')) {
+      const devUser = {
+        id: 'dev-user-1',
+        name: 'Dev User',
+        email: 'dev@example.com'
+      }
+      setUser(devUser)
+      setSession({ access_token: 'dev-token', refresh_token: null })
+    }
+
+    // Set dev neighbourhood and navigate
+    const devNeighbourhood = {
+      id: 'dev-neighbourhood-1',
+      name: 'Development Neighbourhood',
+      city: 'Cape Town',
+      province: 'Western Cape',
+      country: 'South Africa'
+    }
+    setNeighbourhood(devNeighbourhood)
+    navigate('/')
+  }
+
   return (
     <div className="min-h-screen bg-white px-4 py-8">
       <motion.div
@@ -238,6 +265,28 @@ export default function NeighbourhoodSelectPage() {
       >
         <h1 className="text-3xl font-bold text-black mb-2">Select Your Neighbourhood</h1>
         <p className="text-gray-600 mb-6">Choose your local community</p>
+
+        {/* Developer Mode Button */}
+        {import.meta.env.DEV && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 bg-yellow-50 border-2 border-yellow-400 rounded-lg"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-yellow-800 mb-1">🔧 Developer Mode</p>
+                <p className="text-xs text-yellow-700">Skip authentication and use mock data</p>
+              </div>
+              <button
+                onClick={handleDevMode}
+                className="px-4 py-2 bg-yellow-500 text-black rounded-lg font-medium hover:bg-yellow-600 transition-colors text-sm whitespace-nowrap"
+              >
+                Enter Dev Mode
+              </button>
+            </div>
+          </motion.div>
+        )}
 
         <div className="mb-6 space-y-3">
           <button

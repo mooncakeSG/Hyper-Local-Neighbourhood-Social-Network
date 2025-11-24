@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { supabase } from '../lib/supabaseClient'
 import { useUserStore } from '../store/useUserStore'
 
 export default function PostComposer({ onClose, onSuccess }) {
   const [content, setContent] = useState('')
   const [type, setType] = useState('post') // 'post' or 'alert'
   const [loading, setLoading] = useState(false)
-  const { user, neighbourhood } = useUserStore()
+  const { user, neighbourhood, session } = useUserStore()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -15,27 +14,46 @@ export default function PostComposer({ onClose, onSuccess }) {
 
     setLoading(true)
     try {
-      // In dev mode, skip Supabase insert
-      if (user?.id?.startsWith('dev-user-')) {
-        console.log('Dev mode: Post would be created:', { content, type })
+      // DEV MODE: Bypass API call
+      const isDevMode = user?.id?.startsWith('dev-user-') || neighbourhood?.id?.startsWith('dev-neighbourhood-')
+      
+      if (isDevMode) {
+        console.log('🔧 DEV MODE: Post would be created:', { content, type, neighbourhood: neighbourhood.name })
         onSuccess()
         return
       }
 
-      const { error } = await supabase
-        .from('posts')
-        .insert({
-          user_id: user.id,
-          neighbourhood_id: neighbourhood.id,
-          content: content.trim(),
-          type: type,
-        })
+      // PRODUCTION: Create post via backend API
+      const accessToken = session?.access_token
+      if (!accessToken) {
+        throw new Error('No access token found. Please sign in again.')
+      }
 
-      if (error) throw error
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/posts`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({
+            content: content.trim(),
+            type: type,
+            neighbourhood_id: neighbourhood.id,
+          })
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to create post')
+      }
+
       onSuccess()
     } catch (err) {
       console.error('Error creating post:', err)
-      alert('Failed to create post')
+      alert('Failed to create post: ' + err.message)
     } finally {
       setLoading(false)
     }

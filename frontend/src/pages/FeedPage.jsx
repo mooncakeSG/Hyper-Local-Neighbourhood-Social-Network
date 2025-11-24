@@ -1,12 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '../lib/supabaseClient'
 import { useUserStore } from '../store/useUserStore'
 import PostCard from '../components/PostCard'
 import PostComposer from '../components/PostComposer'
 import { useState } from 'react'
 
 export default function FeedPage() {
-  const { neighbourhood } = useUserStore()
+  const { neighbourhood, user, session } = useUserStore()
   const [showComposer, setShowComposer] = useState(false)
 
   const { data: posts, isLoading, refetch } = useQuery({
@@ -14,33 +13,53 @@ export default function FeedPage() {
     queryFn: async () => {
       if (!neighbourhood?.id) return []
 
-      // In dev mode, return mock data
-      if (neighbourhood?.id?.startsWith('dev-neighbourhood-')) {
+      // DEV MODE: Return mock data
+      const isDevMode = neighbourhood?.id?.startsWith('dev-neighbourhood-') || user?.id?.startsWith('dev-user-')
+      
+      if (isDevMode) {
+        console.log('🔧 DEV MODE: Returning mock posts')
         return [
           {
             id: 'dev-post-1',
             content: 'Welcome to Developer Mode! This is a sample post.',
             type: 'post',
             created_at: new Date().toISOString(),
-            user: { id: 'dev-user-1', name: 'Dev User', phone: '+27123456789' },
-            comments: [],
+            user: { id: 'dev-user-1', name: 'Dev User', email: 'dev@example.com' },
+            comments_count: 0,
             likes_count: 0,
+          },
+          {
+            id: 'dev-post-2',
+            content: '🚨 Alert: This is a sample alert post in dev mode!',
+            type: 'alert',
+            created_at: new Date(Date.now() - 3600000).toISOString(),
+            user: { id: 'dev-user-2', name: 'Test User', email: 'test@example.com' },
+            comments_count: 2,
+            likes_count: 5,
           },
         ]
       }
 
-      const { data, error } = await supabase
-        .from('posts')
-        .select(`
-          *,
-          user:users(id, name, phone),
-          comments(id)
-        `)
-        .eq('neighbourhood_id', neighbourhood.id)
-        .order('created_at', { ascending: false })
-        .limit(50)
+      // PRODUCTION: Fetch posts from backend API
+      const accessToken = session?.access_token
+      const headers = {
+        'Content-Type': 'application/json',
+      }
+      
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`
+      }
 
-      if (error) throw error
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/posts?neighbourhood_id=${neighbourhood.id}`,
+        { headers }
+      )
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch posts')
+      }
+
+      const data = await response.json()
       return data || []
     },
     enabled: !!neighbourhood?.id,

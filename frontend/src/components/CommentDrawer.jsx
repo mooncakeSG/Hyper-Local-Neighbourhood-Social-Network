@@ -1,27 +1,51 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { supabase } from '../lib/supabaseClient'
 import { useUserStore } from '../store/useUserStore'
 import { useQuery } from '@tanstack/react-query'
 
 export default function CommentDrawer({ postId, onClose, onUpdate }) {
   const [comment, setComment] = useState('')
   const [loading, setLoading] = useState(false)
-  const { user } = useUserStore()
+  const { user, session } = useUserStore()
 
   const { data: comments, refetch } = useQuery({
     queryKey: ['comments', postId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('comments')
-        .select(`
-          *,
-          user:users(id, name, phone)
-        `)
-        .eq('post_id', postId)
-        .order('created_at', { ascending: true })
+      // DEV MODE: Return mock comments
+      const isDevMode = user?.id?.startsWith('dev-user-') || postId?.startsWith('dev-post-')
+      
+      if (isDevMode) {
+        console.log('🔧 DEV MODE: Returning mock comments')
+        return [
+          {
+            id: 'dev-comment-1',
+            content: 'This is a sample comment in dev mode!',
+            created_at: new Date(Date.now() - 1800000).toISOString(),
+            user: { id: 'dev-user-1', name: 'Dev User', email: 'dev@example.com' },
+          },
+        ]
+      }
 
-      if (error) throw error
+      // PRODUCTION: Fetch comments from backend API
+      const accessToken = session?.access_token
+      const headers = {
+        'Content-Type': 'application/json',
+      }
+      
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/comments/post/${postId}`,
+        { headers }
+      )
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch comments')
+      }
+
+      const data = await response.json()
       return data || []
     },
   })
@@ -32,30 +56,49 @@ export default function CommentDrawer({ postId, onClose, onUpdate }) {
 
     setLoading(true)
     try {
-      // In dev mode, skip Supabase insert
-      if (user?.id?.startsWith('dev-user-')) {
-        console.log('Dev mode: Comment would be created:', { postId, content: comment })
+      // DEV MODE: Bypass API call
+      const isDevMode = user?.id?.startsWith('dev-user-') || postId?.startsWith('dev-post-')
+      
+      if (isDevMode) {
+        console.log('🔧 DEV MODE: Comment would be created:', { postId, content: comment })
         setComment('')
         refetch()
         onUpdate()
         return
       }
 
-      const { error } = await supabase
-        .from('comments')
-        .insert({
-          post_id: postId,
-          user_id: user.id,
-          content: comment.trim(),
-        })
+      // PRODUCTION: Create comment via backend API
+      const accessToken = session?.access_token
+      if (!accessToken) {
+        throw new Error('No access token found. Please sign in again.')
+      }
 
-      if (error) throw error
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/comments`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({
+            post_id: postId,
+            content: comment.trim(),
+          })
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to create comment')
+      }
+
       setComment('')
       refetch()
       onUpdate()
     } catch (err) {
       console.error('Error creating comment:', err)
-      alert('Failed to post comment')
+      alert('Failed to post comment: ' + err.message)
     } finally {
       setLoading(false)
     }
