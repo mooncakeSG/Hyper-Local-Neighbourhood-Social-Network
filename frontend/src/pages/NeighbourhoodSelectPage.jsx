@@ -9,8 +9,11 @@ export default function NeighbourhoodSelectPage() {
   const [loading, setLoading] = useState(true)
   const [selectedNeighbourhood, setSelectedNeighbourhood] = useState(null)
   const [useGPS, setUseGPS] = useState(false)
+  const [manualLocation, setManualLocation] = useState('')
+  const [showManualInput, setShowManualInput] = useState(false)
+  const [locationError, setLocationError] = useState('')
   const navigate = useNavigate()
-  const { user, setNeighbourhood } = useUserStore()
+  const { user, setNeighbourhood, session } = useUserStore()
 
   useEffect(() => {
     fetchNeighbourhoods()
@@ -28,50 +31,155 @@ export default function NeighbourhoodSelectPage() {
         return
       }
 
-      const { data, error } = await supabase
-        .from('neighbourhoods')
-        .select('*')
-        .order('name')
+      // Use backend API instead of direct Supabase query
+      const session = useUserStore.getState().session
+      const accessToken = session?.access_token || user?.session?.access_token
+      
+      const headers = {}
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`
+      }
+      
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/neighbourhoods`, {
+        headers
+      })
 
-      if (error) throw error
+      if (!response.ok) {
+        throw new Error('Failed to fetch neighbourhoods')
+      }
+
+      const data = await response.json()
       setNeighbourhoods(data || [])
     } catch (err) {
       console.error('Error fetching neighbourhoods:', err)
+      // Fallback to empty array if fetch fails
+      setNeighbourhoods([])
     } finally {
       setLoading(false)
     }
   }
 
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    // Haversine formula to calculate distance between two coordinates
+    const R = 6371 // Radius of the Earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLon = (lon2 - lon1) * Math.PI / 180
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon/2) * Math.sin(dLon/2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+    return R * c // Distance in km
+  }
+
+  const findNearestNeighbourhood = (latitude, longitude) => {
+    // Find the nearest neighbourhood based on coordinates
+    let nearest = null
+    let minDistance = Infinity
+
+    neighbourhoods.forEach(neighbourhood => {
+      if (neighbourhood.latitude && neighbourhood.longitude) {
+        const distance = calculateDistance(
+          latitude,
+          longitude,
+          neighbourhood.latitude,
+          neighbourhood.longitude
+        )
+        if (distance < minDistance) {
+          minDistance = distance
+          nearest = { ...neighbourhood, distance }
+        }
+      }
+    })
+
+    return nearest
+  }
+
   const handleGPSSelect = () => {
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser')
+      setLocationError('Geolocation is not supported by your browser')
       return
     }
 
     setUseGPS(true)
+    setLocationError('')
+    
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords
         
-        // Find nearest neighbourhood (simplified - would need proper geospatial query)
-        const { data, error } = await supabase
-          .from('neighbourhoods')
-          .select('*')
-          .limit(1)
-
-        if (data && data.length > 0) {
-          await selectNeighbourhood(data[0])
-        } else {
-          alert('No neighbourhood found near your location')
+        try {
+          // Find nearest neighbourhood
+          const nearest = findNearestNeighbourhood(latitude, longitude)
+          
+          if (nearest) {
+            if (nearest.distance < 50) { // Within 50km
+              await selectNeighbourhood(nearest)
+            } else {
+              setLocationError(`Nearest neighbourhood is ${nearest.distance.toFixed(1)}km away. Please select manually.`)
+              setUseGPS(false)
+            }
+          } else if (neighbourhoods.length > 0) {
+            // No coordinates available, show list
+            setLocationError('Location detected, but no nearby neighbourhoods found. Please select from the list.')
+            setUseGPS(false)
+          } else {
+            setLocationError('No neighbourhoods available. Please contact support.')
+            setUseGPS(false)
+          }
+        } catch (error) {
+          console.error('Error selecting neighbourhood:', error)
+          setLocationError('Failed to select neighbourhood. Please try again.')
           setUseGPS(false)
         }
       },
       (error) => {
         console.error('Geolocation error:', error)
-        alert('Failed to get your location')
+        let errorMessage = 'Failed to get your location. '
+        if (error.code === 1) {
+          errorMessage += 'Location permission denied. Please enable location access or select manually.'
+        } else if (error.code === 2) {
+          errorMessage += 'Location unavailable. Please select manually.'
+        } else {
+          errorMessage += 'Please select a neighbourhood from the list below.'
+        }
+        setLocationError(errorMessage)
         setUseGPS(false)
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
       }
     )
+  }
+
+  const handleManualSearch = () => {
+    if (!manualLocation.trim()) {
+      setLocationError('Please enter a location to search')
+      return
+    }
+
+    setLocationError('')
+    const searchTerm = manualLocation.toLowerCase().trim()
+    
+    // Search by city or neighbourhood name
+    const matches = neighbourhoods.filter(n => 
+      n.name.toLowerCase().includes(searchTerm) ||
+      (n.city && n.city.toLowerCase().includes(searchTerm)) ||
+      (n.province && n.province.toLowerCase().includes(searchTerm))
+    )
+
+    if (matches.length === 1) {
+      selectNeighbourhood(matches[0])
+    } else if (matches.length > 1) {
+      // Show matching neighbourhoods
+      setNeighbourhoods(matches)
+      setShowManualInput(false)
+      setLocationError(`Found ${matches.length} matching neighbourhoods. Please select one.`)
+    } else {
+      setLocationError(`No neighbourhoods found matching "${manualLocation}". Please try a different search term.`)
+    }
   }
 
   const selectNeighbourhood = async (neighbourhood) => {
@@ -83,13 +191,27 @@ export default function NeighbourhoodSelectPage() {
         return
       }
 
-      // Update user's neighbourhood
-      const { error } = await supabase
-        .from('users')
-        .update({ neighbourhood_id: neighbourhood.id })
-        .eq('id', user.id)
+      // Update user's neighbourhood via backend API
+      const session = useUserStore.getState().session
+      const accessToken = session?.access_token || user?.session?.access_token
+      
+      if (!accessToken) {
+        throw new Error('No access token found. Please sign in again.')
+      }
+      
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/users/neighbourhood`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ neighbourhood_id: neighbourhood.id })
+      })
 
-      if (error) throw error
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to update neighbourhood')
+      }
 
       setNeighbourhood(neighbourhood)
       navigate('/')
@@ -117,30 +239,97 @@ export default function NeighbourhoodSelectPage() {
         <h1 className="text-3xl font-bold text-black mb-2">Select Your Neighbourhood</h1>
         <p className="text-gray-600 mb-6">Choose your local community</p>
 
-        <button
-          onClick={handleGPSSelect}
-          disabled={useGPS}
-          className="w-full mb-6 bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:opacity-50"
-        >
-          {useGPS ? 'Detecting location...' : 'Use Current Location'}
-        </button>
+        <div className="mb-6 space-y-3">
+          <button
+            onClick={handleGPSSelect}
+            disabled={useGPS}
+            className="w-full bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:opacity-50"
+          >
+            {useGPS ? 'Detecting location...' : '📍 Use Current Location'}
+          </button>
 
-        <div className="space-y-2">
-          {neighbourhoods.map((neighbourhood) => (
-            <motion.button
-              key={neighbourhood.id}
-              onClick={() => selectNeighbourhood(neighbourhood)}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="w-full text-left p-4 border border-black rounded-lg hover:bg-gray-50 transition-colors"
+          <div className="flex items-center gap-2">
+            <div className="flex-1 border-t border-gray-300"></div>
+            <span className="text-sm text-gray-500">OR</span>
+            <div className="flex-1 border-t border-gray-300"></div>
+          </div>
+
+          {!showManualInput ? (
+            <button
+              onClick={() => setShowManualInput(true)}
+              className="w-full bg-white border-2 border-black text-black py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors"
             >
-              <div className="font-medium text-black">{neighbourhood.name}</div>
-              {neighbourhood.city && (
-                <div className="text-sm text-gray-600">{neighbourhood.city}</div>
-              )}
-            </motion.button>
-          ))}
+              🔍 Search by Location
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={manualLocation}
+                  onChange={(e) => setManualLocation(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleManualSearch()}
+                  placeholder="Enter city or neighbourhood name..."
+                  className="flex-1 px-4 py-3 border border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
+                />
+                <button
+                  onClick={handleManualSearch}
+                  className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+                >
+                  Search
+                </button>
+              </div>
+              <button
+                onClick={() => {
+                  setShowManualInput(false)
+                  setManualLocation('')
+                  setLocationError('')
+                  fetchNeighbourhoods() // Reset to show all neighbourhoods
+                }}
+                className="w-full text-sm text-gray-600 hover:text-black"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {locationError && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800"
+            >
+              {locationError}
+            </motion.div>
+          )}
         </div>
+
+        {neighbourhoods.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-600 mb-4">No neighbourhoods available yet.</p>
+            <p className="text-sm text-gray-500">Please contact support to add neighbourhoods to the system.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600 mb-2">
+              {showManualInput ? 'Search results:' : 'Select from the list:'}
+            </p>
+            {neighbourhoods.map((neighbourhood) => (
+              <motion.button
+                key={neighbourhood.id}
+                onClick={() => selectNeighbourhood(neighbourhood)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full text-left p-4 border border-black rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <div className="font-medium text-black">{neighbourhood.name}</div>
+                {neighbourhood.city && (
+                  <div className="text-sm text-gray-600">{neighbourhood.city}</div>
+                )}
+              </motion.button>
+            ))}
+          </div>
+        )}
       </motion.div>
     </div>
   )

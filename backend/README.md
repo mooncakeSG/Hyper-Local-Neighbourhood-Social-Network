@@ -63,6 +63,26 @@ python -m uvicorn main:app --reload
 - `PATCH /api/v1/users/me` - Update user profile
 - `POST /api/v1/users/neighbourhood` - Update user's neighbourhood
 
+### Upload
+- `POST /api/v1/upload/image` - Upload image file
+- `DELETE /api/v1/upload/image` - Delete image file
+
+### Marketplace
+- `POST /api/v1/marketplace/` - Create marketplace item
+- `GET /api/v1/marketplace/` - Get marketplace items (with filters)
+- `GET /api/v1/marketplace/{item_id}` - Get item by ID
+- `PATCH /api/v1/marketplace/{item_id}` - Update item (owner only)
+- `DELETE /api/v1/marketplace/{item_id}` - Delete item (owner only)
+- `GET /api/v1/marketplace/search` - Search items
+
+### Businesses
+- `POST /api/v1/businesses/` - Create business listing
+- `GET /api/v1/businesses/` - Get business listings (with filters)
+- `GET /api/v1/businesses/{business_id}` - Get business by ID
+- `PATCH /api/v1/businesses/{business_id}` - Update business (owner only)
+- `DELETE /api/v1/businesses/{business_id}` - Delete business (owner only)
+- `GET /api/v1/businesses/search` - Search businesses
+
 ### Notifications
 - `POST /api/v1/notifications/register` - Register OneSignal player ID
 - `GET /api/v1/notifications/test-connection` - Test OneSignal connection

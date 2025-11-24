@@ -1,13 +1,19 @@
 from fastapi import APIRouter, HTTPException, Depends, Header
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from app.services.supabase_service import supabase_service
+from app.services.auth_service import auth_service
 
 router = APIRouter()
 
 class CommentCreate(BaseModel):
     post_id: str
     content: str
+    
+    @validator('content')
+    def validate_content(cls, v):
+        from app.utils.validators import sanitize_string
+        return sanitize_string(v, max_length=2000)
 
 class CommentUpdate(BaseModel):
     content: str
@@ -21,15 +27,8 @@ class CommentResponse(BaseModel):
     updated_at: str
 
 async def get_user_id(authorization: Optional[str] = Header(None)) -> str:
-    """Extract user ID from authorization header"""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing authorization")
-    # In production, verify JWT token from Supabase
-    # For now, assuming format: "Bearer {user_id}"
-    try:
-        return authorization.replace("Bearer ", "")
-    except:
-        raise HTTPException(status_code=401, detail="Invalid authorization")
+    """Extract and verify user ID from authorization header"""
+    return await auth_service.get_user_id_from_token(authorization)
 
 @router.post("/", response_model=CommentResponse)
 async def create_comment(

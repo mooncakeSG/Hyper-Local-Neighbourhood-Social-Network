@@ -199,6 +199,53 @@ Content-Type: application/json
 
 ---
 
+## Upload API
+
+### Upload Image
+```http
+POST /api/v1/upload/image?folder={folder}
+Authorization: Bearer {token}
+Content-Type: multipart/form-data
+
+Form Data:
+- file: (required) Image file (JPEG, PNG, WebP, GIF)
+- folder: (optional query param) Folder name (default: "posts")
+```
+
+**Query Parameters:**
+- `folder` (optional): Folder name for organization (default: "posts")
+
+**Response:**
+```json
+{
+  "success": true,
+  "url": "https://...supabase.co/storage/v1/object/public/post-images/posts/user-id/uuid.jpg",
+  "message": "Image uploaded successfully"
+}
+```
+
+**File Requirements:**
+- Types: JPEG, JPG, PNG, WebP, GIF
+- Max size: 5MB
+- Must be a valid image file
+
+### Delete Image
+```http
+DELETE /api/v1/upload/image?image_url={url}
+Authorization: Bearer {token}
+```
+
+**Query Parameters:**
+- `image_url` (required): Public URL of the image to delete
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Image deleted successfully"
+}
+```
+
 ## Notifications API
 
 ### Register OneSignal Player ID

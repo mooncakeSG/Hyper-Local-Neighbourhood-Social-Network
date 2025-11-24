@@ -3,6 +3,7 @@ from typing import Optional
 from pydantic import BaseModel
 from app.services.supabase_service import supabase_service
 from app.services.onesignal_service import onesignal_service
+from app.services.auth_service import auth_service
 
 router = APIRouter()
 
@@ -15,13 +16,8 @@ class TestNotificationRequest(BaseModel):
     message: Optional[str] = "This is a test notification from Neighbourhood Social Network"
 
 async def get_user_id(authorization: Optional[str] = Header(None)) -> str:
-    """Extract user ID from authorization header"""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing authorization")
-    try:
-        return authorization.replace("Bearer ", "")
-    except:
-        raise HTTPException(status_code=401, detail="Invalid authorization")
+    """Extract and verify user ID from authorization header"""
+    return await auth_service.get_user_id_from_token(authorization)
 
 @router.get("/test-connection")
 async def test_onesignal_connection():

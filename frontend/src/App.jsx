@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useUserStore } from './store/useUserStore'
 import AuthPage from './pages/AuthPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import NeighbourhoodSelectPage from './pages/NeighbourhoodSelectPage'
 import FeedPage from './pages/FeedPage'
 import Layout from './components/Layout'
@@ -10,9 +11,10 @@ function App() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Routes>
-        <Route path="/auth" element={<AuthPage />} />
-        {!user && <Route path="*" element={<Navigate to="/auth" replace />} />}
+                  <Routes>
+                    <Route path="/auth" element={<AuthPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
+                    {!user && <Route path="*" element={<Navigate to="/auth" replace />} />}
         {user && !neighbourhood && (
           <Route path="/select-neighbourhood" element={<NeighbourhoodSelectPage />} />
         )}
