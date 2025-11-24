@@ -1,6 +1,6 @@
 # Neighbourhood Social Network
 
-A hyper-local social platform for South African neighbourhoods, inspired by Cal.com's black/white design aesthetic.
+A hyper-local social platform for South African neighbourhoods.
 
 ## 🎯 Project Overview
 
@@ -14,7 +14,7 @@ This platform enables neighbours to connect, share local updates, post alerts, b
 - **State Management**: Zustand + React Query
 - **Animations**: Framer Motion
 - **Routing**: React Router
-- **Design**: Mobile-first, social media vibe, Cal.com inspired
+- **Design**: Mobile-first, social media vibe
 
 ### Backend
 - **Framework**: FastAPI (async)
@@ -163,9 +163,6 @@ docker build -t neighbourhood-api .
 - **First Launch Area**: One South African suburb only
 - **Viral Loop**: Invite link per user + WhatsApp group migration
 
-## 🤝 Contributing
-
-This is a private project. For questions or issues, please contact the development team.
 
 ## 📄 License
 
