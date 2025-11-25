@@ -11,7 +11,7 @@ export default function Layout() {
   const handleLogout = async () => {
     await supabase.auth.signOut()
     clearUser()
-    navigate('/auth')
+    navigate('/')
   }
 
   return (
@@ -23,9 +23,9 @@ export default function Layout() {
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-black">
         <div className="max-w-2xl mx-auto flex justify-around items-center h-16">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/app')}
             className={`flex flex-col items-center justify-center flex-1 ${
-              location.pathname === '/' ? 'text-black' : 'text-gray-400'
+              location.pathname === '/app' ? 'text-black' : 'text-gray-400'
             }`}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -35,9 +35,9 @@ export default function Layout() {
           </button>
           
           <button
-            onClick={() => navigate('/marketplace')}
+            onClick={() => navigate('/app/marketplace')}
             className={`flex flex-col items-center justify-center flex-1 ${
-              location.pathname === '/marketplace' ? 'text-black' : 'text-gray-400'
+              location.pathname === '/app/marketplace' ? 'text-black' : 'text-gray-400'
             }`}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,9 +47,9 @@ export default function Layout() {
           </button>
           
           <button
-            onClick={() => navigate('/businesses')}
+            onClick={() => navigate('/app/businesses')}
             className={`flex flex-col items-center justify-center flex-1 ${
-              location.pathname === '/businesses' ? 'text-black' : 'text-gray-400'
+              location.pathname === '/app/businesses' ? 'text-black' : 'text-gray-400'
             }`}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -59,9 +59,9 @@ export default function Layout() {
           </button>
           
           <button
-            onClick={() => navigate('/profile')}
+            onClick={() => navigate('/app/profile')}
             className={`flex flex-col items-center justify-center flex-1 ${
-              location.pathname === '/profile' ? 'text-black' : 'text-gray-400'
+              location.pathname === '/app/profile' ? 'text-black' : 'text-gray-400'
             }`}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

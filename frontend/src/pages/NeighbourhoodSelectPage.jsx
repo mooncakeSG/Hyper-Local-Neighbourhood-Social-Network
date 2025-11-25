@@ -190,7 +190,7 @@ export default function NeighbourhoodSelectPage() {
       if (isDevMode) {
         console.log('🔧 DEV MODE: Bypassing API call, setting neighbourhood directly')
         setNeighbourhood(neighbourhood)
-        navigate('/')
+        navigate('/app')
         return
       }
 
@@ -217,7 +217,7 @@ export default function NeighbourhoodSelectPage() {
       }
 
       setNeighbourhood(neighbourhood)
-      navigate('/')
+      navigate('/app')
     } catch (err) {
       console.error('Error selecting neighbourhood:', err)
       alert('Failed to select neighbourhood')
@@ -253,7 +253,7 @@ export default function NeighbourhoodSelectPage() {
       country: 'South Africa'
     }
     setNeighbourhood(devNeighbourhood)
-    navigate('/')
+    navigate('/app')
   }
 
   return (

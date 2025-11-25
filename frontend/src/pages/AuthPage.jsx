@@ -159,7 +159,7 @@ VITE_HCAPTCHA_SITE_KEY=your_hcaptcha_site_key`}
 
       // Navigate to neighbourhood selection or feed
       if (data.user.neighbourhood_id) {
-        navigate('/')
+        navigate('/app')
       } else {
         navigate('/select-neighbourhood')
       }
