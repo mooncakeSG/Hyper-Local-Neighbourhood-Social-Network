@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useUserStore } from '../store/useUserStore'
+import ImageUploader from './ImageUploader'
 
 export default function PostComposer({ onClose, onSuccess }) {
   const [content, setContent] = useState('')
   const [type, setType] = useState('post') // 'post' or 'alert'
+  const [imageUrl, setImageUrl] = useState(null)
   const [loading, setLoading] = useState(false)
   const { user, neighbourhood, session } = useUserStore()
 
@@ -41,6 +43,7 @@ export default function PostComposer({ onClose, onSuccess }) {
             content: content.trim(),
             type: type,
             neighbourhood_id: neighbourhood.id,
+            image_url: imageUrl || undefined,
           })
         }
       )
@@ -120,6 +123,16 @@ export default function PostComposer({ onClose, onSuccess }) {
             rows={6}
             required
           />
+
+          <div>
+            <label className="block text-sm font-medium text-black mb-2">
+              Image (optional)
+            </label>
+            <ImageUploader
+              onImageUploaded={(url) => setImageUrl(url)}
+              onImageRemoved={() => setImageUrl(null)}
+            />
+          </div>
 
           <div className="flex gap-2">
             <button

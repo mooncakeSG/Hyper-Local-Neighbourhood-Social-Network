@@ -95,7 +95,7 @@ export default function NeighbourhoodSelectPage() {
     return nearest
   }
 
-  const handleGPSSelect = () => {
+  const handleGPSSelect = async () => {
     if (!navigator.geolocation) {
       setLocationError('Geolocation is not supported by your browser')
       return

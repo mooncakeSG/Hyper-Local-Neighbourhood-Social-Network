@@ -4,6 +4,7 @@ import { supabase, hasSupabaseConfig } from '../lib/supabaseClient'
 import { useUserStore } from '../store/useUserStore'
 import { motion } from 'framer-motion'
 import HCaptcha from '@hcaptcha/react-hcaptcha'
+import { setupOneSignalForUser } from '../utils/notifications'
 
 export default function AuthPage() {
   const [email, setEmail] = useState('')
@@ -79,6 +80,15 @@ VITE_HCAPTCHA_SITE_KEY=your_hcaptcha_site_key`}
       setUser(data.user)
       setSession({ access_token: data.access_token, refresh_token: data.refresh_token })
 
+      // Initialize OneSignal notifications (non-blocking)
+      const onesignalAppId = import.meta.env.VITE_ONESIGNAL_APP_ID
+      if (onesignalAppId) {
+        setupOneSignalForUser(onesignalAppId, data.access_token).catch((err) => {
+          console.warn('OneSignal setup failed:', err)
+          // Don't block navigation if OneSignal fails
+        })
+      }
+
       // Reset captcha
       if (captchaRef && typeof captchaRef.reset === 'function') {
         captchaRef.reset()
@@ -131,6 +141,15 @@ VITE_HCAPTCHA_SITE_KEY=your_hcaptcha_site_key`}
       // Store session
       setUser(data.user)
       setSession({ access_token: data.access_token, refresh_token: data.refresh_token })
+
+      // Initialize OneSignal notifications (non-blocking)
+      const onesignalAppId = import.meta.env.VITE_ONESIGNAL_APP_ID
+      if (onesignalAppId) {
+        setupOneSignalForUser(onesignalAppId, data.access_token).catch((err) => {
+          console.warn('OneSignal setup failed:', err)
+          // Don't block navigation if OneSignal fails
+        })
+      }
 
       // Reset captcha
       if (captchaRef && typeof captchaRef.reset === 'function') {

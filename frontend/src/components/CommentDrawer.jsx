@@ -1,12 +1,97 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useUserStore } from '../store/useUserStore'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 export default function CommentDrawer({ postId, onClose, onUpdate }) {
   const [comment, setComment] = useState('')
+  const [editingCommentId, setEditingCommentId] = useState(null)
+  const [editContent, setEditContent] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
   const [loading, setLoading] = useState(false)
   const { user, session } = useUserStore()
+  const queryClient = useQueryClient()
+
+  // Update comment mutation
+  const updateCommentMutation = useMutation({
+    mutationFn: async ({ commentId, content }) => {
+      // DEV MODE: Bypass API call
+      const isDevMode = user?.id?.startsWith('dev-user-') || postId?.startsWith('dev-post-')
+      
+      if (isDevMode) {
+        console.log('🔧 DEV MODE: Comment would be updated:', { commentId, content })
+        return
+      }
+
+      // PRODUCTION: Update comment via backend API
+      const accessToken = session?.access_token
+      if (!accessToken) {
+        throw new Error('No access token found. Please sign in again.')
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/comments/${commentId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({ content: content.trim() })
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to update comment')
+      }
+
+      return response.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['comments', postId])
+      onUpdate()
+    }
+  })
+
+  // Delete comment mutation
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (commentId) => {
+      // DEV MODE: Bypass API call
+      const isDevMode = user?.id?.startsWith('dev-user-') || postId?.startsWith('dev-post-')
+      
+      if (isDevMode) {
+        console.log('🔧 DEV MODE: Comment would be deleted:', commentId)
+        return
+      }
+
+      // PRODUCTION: Delete comment via backend API
+      const accessToken = session?.access_token
+      if (!accessToken) {
+        throw new Error('No access token found. Please sign in again.')
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/comments/${commentId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || 'Failed to delete comment')
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['comments', postId])
+      onUpdate()
+      setShowDeleteConfirm(null)
+    }
+  })
 
   const { data: comments, refetch } = useQuery({
     queryKey: ['comments', postId],
@@ -146,19 +231,87 @@ export default function CommentDrawer({ postId, onClose, onUpdate }) {
 
         <div className="flex-1 overflow-y-auto space-y-4 mb-4">
           {comments && comments.length > 0 ? (
-            comments.map((comment) => (
-              <div key={comment.id} className="border-b border-gray-200 pb-3">
-                <div className="flex items-start justify-between mb-1">
-                  <div className="font-medium text-black text-sm">
-                    {comment.user?.name || comment.user?.phone || 'Anonymous'}
+            comments.map((commentItem) => {
+              const isOwner = user && commentItem.user_id === user.id
+              const isEditing = editingCommentId === commentItem.id
+
+              return (
+                <div key={commentItem.id} className="border-b border-gray-200 pb-3">
+                  <div className="flex items-start justify-between mb-1">
+                    <div className="font-medium text-black text-sm">
+                      {commentItem.user?.name || commentItem.user?.phone || 'Anonymous'}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs text-gray-500">
+                        {formatTime(commentItem.created_at)}
+                      </div>
+                      {isOwner && !isEditing && (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => {
+                              setEditingCommentId(commentItem.id)
+                              setEditContent(commentItem.content)
+                            }}
+                            className="text-xs text-gray-500 hover:text-black"
+                            aria-label="Edit comment"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => setShowDeleteConfirm(commentItem.id)}
+                            className="text-xs text-gray-500 hover:text-red-600"
+                            aria-label="Delete comment"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500">
-                    {formatTime(comment.created_at)}
-                  </div>
+                  {isEditing ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        className="w-full px-3 py-2 border border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm resize-none"
+                        rows={2}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={async () => {
+                            await updateCommentMutation.mutateAsync({
+                              commentId: commentItem.id,
+                              content: editContent.trim()
+                            })
+                            setEditingCommentId(null)
+                            setEditContent('')
+                          }}
+                          disabled={updateCommentMutation.isLoading || !editContent.trim()}
+                          className="px-3 py-1 bg-black text-white text-xs rounded hover:bg-gray-800 disabled:opacity-50"
+                        >
+                          {updateCommentMutation.isLoading ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingCommentId(null)
+                            setEditContent('')
+                          }}
+                          className="px-3 py-1 border border-black text-black text-xs rounded hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-black text-sm">{commentItem.content}</p>
+                  )}
                 </div>
-                <p className="text-black text-sm">{comment.content}</p>
-              </div>
-            ))
+              )
+            })
           ) : (
             <div className="text-center text-gray-500 py-8">
               No comments yet. Be the first!
@@ -182,6 +335,41 @@ export default function CommentDrawer({ postId, onClose, onUpdate }) {
             {loading ? '...' : 'Post'}
           </button>
         </form>
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 bg-black bg-opacity-75 z-60 flex items-center justify-center"
+            onClick={() => setShowDeleteConfirm(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-lg p-6 max-w-sm mx-4"
+            >
+              <h3 className="text-lg font-bold text-black mb-2">Delete Comment?</h3>
+              <p className="text-gray-600 mb-4">This action cannot be undone.</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowDeleteConfirm(null)}
+                  className="flex-1 py-2 border border-black rounded-lg text-black hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => deleteCommentMutation.mutate(showDeleteConfirm)}
+                  disabled={deleteCommentMutation.isLoading}
+                  className="flex-1 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
+                >
+                  {deleteCommentMutation.isLoading ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </motion.div>
     </motion.div>
   )
