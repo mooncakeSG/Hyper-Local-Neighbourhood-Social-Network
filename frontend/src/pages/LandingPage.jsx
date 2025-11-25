@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useUserStore } from '../store/useUserStore'
+import ChatbotWidget from '../components/ChatbotWidget'
 
 export default function LandingPage() {
   const navigate = useNavigate()
@@ -294,6 +295,9 @@ export default function LandingPage() {
           </motion.div>
         </div>
       </section>
+
+      {/* Chatbot Widget */}
+      <ChatbotWidget isLandingPage={true} />
 
       {/* Footer */}
       <footer className="py-12 px-4 sm:px-6 lg:px-8 border-t border-black bg-white">

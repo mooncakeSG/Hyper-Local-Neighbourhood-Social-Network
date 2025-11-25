@@ -6,7 +6,7 @@
 import Groq from 'groq-sdk';
 
 class GroqService {
-  constructor(apiKey, model = 'llama-3.1-70b-versatile') {
+  constructor(apiKey, model = 'llama-3.3-70b-versatile') {
     if (!apiKey) {
       console.warn('Groq API key not provided. Chatbot will use rule-based responses only.');
       this.client = null;
@@ -53,52 +53,85 @@ class GroqService {
           },
         ],
         model: this.model,
-        max_tokens: 10,
+        max_tokens: 50,
+        temperature: 0.7,
       });
 
-      const response = testResponse.choices[0]?.message?.content;
-      if (response) {
+      // Debug: Log full response structure
+      if (!testResponse) {
+        return {
+          success: false,
+          error: 'Groq API returned null response',
+        };
+      }
+
+      if (!testResponse.choices || testResponse.choices.length === 0) {
+        console.warn('Groq test response structure:', testResponse);
+        return {
+          success: false,
+          error: 'Groq API returned response with no choices',
+          details: `Response structure: ${JSON.stringify(testResponse).substring(0, 200)}`,
+        };
+      }
+
+      const choice = testResponse.choices[0];
+      if (!choice) {
+        return {
+          success: false,
+          error: 'Groq API returned response with invalid choice structure',
+        };
+      }
+
+      const response = choice.message?.content;
+      if (response && response.trim()) {
         return {
           success: true,
           message: 'Groq API connection successful',
+          response: response.trim(),
         };
       } else {
+        // Log the full response for debugging
+        console.warn('Groq test response (empty content):', {
+          model: testResponse.model,
+          choices: testResponse.choices,
+          usage: testResponse.usage,
+        });
         return {
           success: false,
-          error: 'Groq API returned empty response',
+          error: 'Groq API returned empty response content',
+          details: `Model: ${testResponse.model}, Choices count: ${testResponse.choices?.length || 0}`,
         };
       }
     } catch (error) {
-      let errorMessage = 'Unknown error';
-      let errorType = 'UNKNOWN';
-
-      if (error.message) {
-        errorMessage = error.message;
-        
-        // Categorize errors
-        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-          errorType = 'AUTH_ERROR';
-          errorMessage = 'Invalid API key. Please check your Groq API key.';
-        } else if (error.message.includes('429') || error.message.includes('rate limit')) {
-          errorType = 'RATE_LIMIT';
-          errorMessage = 'Rate limit exceeded. Please try again later.';
-        } else if (error.message.includes('500') || error.message.includes('Internal Server Error')) {
-          errorType = 'SERVER_ERROR';
-          errorMessage = 'Groq server error. Please try again later.';
-        } else if (error.message.includes('network') || error.message.includes('fetch')) {
-          errorType = 'NETWORK_ERROR';
-          errorMessage = 'Network error. Please check your internet connection.';
-        } else if (error.message.includes('timeout')) {
-          errorType = 'TIMEOUT';
-          errorMessage = 'Request timed out. Please try again.';
+      // Extract error details from Groq SDK
+      let errorMessage = error.message || 'Unknown error';
+      let errorDetails = null;
+      
+      // Try to extract error details from response
+      if (error.response) {
+        try {
+          if (typeof error.response.json === 'function') {
+            errorDetails = await error.response.json().catch(() => null);
+          } else if (error.response.data) {
+            errorDetails = error.response.data;
+          }
+          
+          if (errorDetails?.error?.message) {
+            errorMessage = errorDetails.error.message;
+          }
+        } catch (e) {
+          // Ignore parsing errors
         }
       }
+      
+      const errorType = this.categorizeError(error, errorDetails);
+      const userMessage = this.getErrorMessage(error, errorDetails);
 
       return {
         success: false,
-        error: errorMessage,
+        error: userMessage,
         errorType: errorType,
-        originalError: error,
+        originalError: errorMessage,
       };
     }
   }
@@ -106,11 +139,40 @@ class GroqService {
   /**
    * Build system prompt with context about the platform
    */
-  buildSystemPrompt(intents, neighbourhoodName = null) {
+  buildSystemPrompt(intents, neighbourhoodName = null, isLandingPage = false) {
     const intentDescriptions = intents.map(intent => {
       const triggers = intent.triggers.join(', ');
       return `- ${intent.name}: ${triggers}`;
     }).join('\n');
+
+    if (isLandingPage) {
+      return `You are NeighbourBot, an AI assistant helping visitors learn about a hyper-local neighbourhood social network platform in South Africa.
+
+Your purpose is to help visitors understand:
+- What the platform is and how it works
+- How to sign up and get started
+- What features are available (community feed, marketplace, business directory, alerts, chat)
+- What a neighbourhood is in the context of this platform
+- Any questions about the platform's capabilities
+
+Guidelines:
+- Be friendly, helpful, and conversational
+- Provide clear, informative answers about the platform
+- Encourage visitors to sign up and explore
+- Keep responses concise and natural
+- Use South African context when relevant (e.g., currency in R, local terminology)
+- If asked about specific actions (like viewing posts, marketplace, etc.), explain that these features are available after signing up
+
+When responding, ALWAYS format your response as valid JSON. Use this exact format:
+
+{
+  "intent": null,
+  "entities": {},
+  "response": "Your helpful, informative response about the platform"
+}
+
+IMPORTANT: Only return valid JSON. Do not include any text before or after the JSON object.`;
+    }
 
     return `You are NeighbourBot, an AI assistant for a hyper-local neighbourhood social network platform in South Africa.
 
@@ -165,7 +227,7 @@ IMPORTANT: Only return valid JSON. Do not include any text before or after the J
       const messages = [
         {
           role: 'system',
-          content: this.buildSystemPrompt(intents, context.neighbourhoodName),
+          content: this.buildSystemPrompt(intents, context.neighbourhoodName, context.isLandingPage),
         },
       ];
 
@@ -243,11 +305,42 @@ IMPORTANT: Only return valid JSON. Do not include any text before or after the J
     } catch (error) {
       console.error('Groq API error:', error);
       
+      // Extract error details from Groq SDK error
+      // Groq SDK errors may have error.response or error.body
+      let errorMessage = error.message || '';
+      let errorDetails = null;
+      
+      if (error.response) {
+        try {
+          // Try to get error details from response
+          if (typeof error.response.json === 'function') {
+            errorDetails = await error.response.json();
+          } else if (error.response.data) {
+            errorDetails = error.response.data;
+          } else if (error.response.body) {
+            errorDetails = error.response.body;
+          }
+          
+          if (errorDetails?.error?.message) {
+            errorMessage = errorDetails.error.message;
+          }
+        } catch (e) {
+          // Response might not be JSON or already parsed
+          if (error.response.data?.error?.message) {
+            errorMessage = error.response.data.error.message;
+          }
+        }
+      }
+      
+      // Check for decommissioned model error in the message
+      const errorType = this.categorizeError(error, errorDetails);
+      
       // Return structured error info
       return {
         error: true,
-        errorType: this.categorizeError(error),
-        errorMessage: this.getErrorMessage(error),
+        errorType: errorType,
+        errorMessage: this.getErrorMessage(error, errorDetails),
+        originalError: errorMessage,
       };
     }
   }
@@ -255,10 +348,39 @@ IMPORTANT: Only return valid JSON. Do not include any text before or after the J
   /**
    * Categorize error type
    */
-  categorizeError(error) {
-    if (!error || !error.message) return 'UNKNOWN';
+  categorizeError(error, errorDetails = null) {
+    if (!error) return 'UNKNOWN';
 
-    const message = error.message.toLowerCase();
+    // Check error details first (for API errors)
+    if (errorDetails?.error) {
+      const apiMessage = (errorDetails.error.message || '').toLowerCase();
+      const errorCode = errorDetails.error.code || '';
+      
+      if (apiMessage.includes('decommissioned') || 
+          apiMessage.includes('no longer supported') || 
+          errorCode === 'model_decommissioned') {
+        return 'MODEL_DECOMMISSIONED';
+      }
+    }
+
+    // Check error response body (for SDK errors)
+    if (error.response) {
+      try {
+        const errorData = error.response.data || error.response.body;
+        if (errorData?.error?.message) {
+          const apiMessage = errorData.error.message.toLowerCase();
+          if (apiMessage.includes('decommissioned') || 
+              apiMessage.includes('no longer supported') || 
+              errorData.error.code === 'model_decommissioned') {
+            return 'MODEL_DECOMMISSIONED';
+          }
+        }
+      } catch (e) {
+        // Ignore parsing errors
+      }
+    }
+
+    const message = (error.message || '').toLowerCase();
     
     if (message.includes('401') || message.includes('unauthorized') || message.includes('invalid api key')) {
       return 'AUTH_ERROR';
@@ -278,6 +400,9 @@ IMPORTANT: Only return valid JSON. Do not include any text before or after the J
     if (message.includes('quota') || message.includes('exceeded')) {
       return 'QUOTA_EXCEEDED';
     }
+    if (message.includes('decommissioned') || message.includes('no longer supported') || message.includes('model_decommissioned')) {
+      return 'MODEL_DECOMMISSIONED';
+    }
     
     return 'UNKNOWN';
   }
@@ -285,8 +410,8 @@ IMPORTANT: Only return valid JSON. Do not include any text before or after the J
   /**
    * Get user-friendly error message
    */
-  getErrorMessage(error) {
-    const errorType = this.categorizeError(error);
+  getErrorMessage(error, errorDetails = null) {
+    const errorType = this.categorizeError(error, errorDetails);
     
     const errorMessages = {
       AUTH_ERROR: 'Invalid Groq API key. Please check your configuration.',
@@ -295,6 +420,7 @@ IMPORTANT: Only return valid JSON. Do not include any text before or after the J
       NETWORK_ERROR: 'Network error. Please check your internet connection.',
       TIMEOUT: 'Request timed out. The service may be slow. Please try again.',
       QUOTA_EXCEEDED: 'API quota exceeded. Please check your Groq account limits.',
+      MODEL_DECOMMISSIONED: 'The configured model has been decommissioned. Please update VITE_GROQ_MODEL in .env to a supported model (e.g., llama-3.3-70b-versatile).',
       UNKNOWN: 'An error occurred with the AI service. Using fallback responses.',
     };
 

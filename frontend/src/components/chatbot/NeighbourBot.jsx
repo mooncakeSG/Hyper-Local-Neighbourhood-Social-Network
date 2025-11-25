@@ -10,7 +10,7 @@ import ApiHealthCheck from '../../utils/chatbot/apiHealthCheck';
 import config from '../../../chatbot.config.json';
 import './NeighbourBot.css';
 
-const NeighbourBot = ({ jwtToken, apiBase, neighbourhoodId, onNeighbourhoodUpdate, backendUrl, useBackend = true }) => {
+const NeighbourBot = ({ jwtToken, apiBase, neighbourhoodId, onNeighbourhoodUpdate, backendUrl, useBackend = true, isLandingPage = false }) => {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isWaitingForConfirmation, setIsWaitingForConfirmation] = useState(false);
@@ -76,18 +76,27 @@ const NeighbourBot = ({ jwtToken, apiBase, neighbourhoodId, onNeighbourhoodUpdat
     
     // Initialize Groq service (fallback if backend not used)
     const groqApiKey = import.meta.env.VITE_GROQ_API_KEY;
-    const groqModel = import.meta.env.VITE_GROQ_MODEL || 'llama-3.1-70b-versatile';
+    const groqModel = import.meta.env.VITE_GROQ_MODEL || 'llama-3.3-70b-versatile';
     groqServiceRef.current = new GroqService(groqApiKey, groqModel);
     
     // Test Groq connection in background (non-blocking)
     if (groqServiceRef.current && groqServiceRef.current.isAvailable) {
       groqServiceRef.current.testConnection().then((result) => {
         if (result.success) {
-          console.log('✅ Groq API connected successfully');
+          console.log('✅ Groq API connected successfully', result.response ? `(Response: "${result.response}")` : '');
         } else {
           console.warn('⚠️ Groq API test failed:', result.error);
+          if (result.details) {
+            console.warn('   Details:', result.details);
+          }
           if (result.errorType === 'AUTH_ERROR') {
             console.warn('⚠️ Please check your VITE_GROQ_API_KEY in .env file');
+          } else if (result.error?.includes('empty response')) {
+            console.warn('⚠️ Groq API is responding but returning empty content. This might indicate:');
+            console.warn('   - Model configuration issue');
+            console.warn('   - API key permissions issue');
+            console.warn('   - Model availability issue');
+            console.warn('   - Try checking: https://console.groq.com/docs/models');
           }
         }
       }).catch((error) => {
@@ -105,13 +114,28 @@ const NeighbourBot = ({ jwtToken, apiBase, neighbourhoodId, onNeighbourhoodUpdat
       contextManagerRef.current.setNeighbourhood(neighbourhoodId);
     }
 
-    // Add welcome message
-    const welcomeMsg = config.chatbot_config.embedding.welcome_message;
+    // Add welcome message - different for landing page vs app
+    let welcomeMsg;
+    let suggestions;
+    
+    if (isLandingPage) {
+      welcomeMsg = "Welcome! I'm here to help you learn about our neighbourhood platform. Ask me anything about how it works, features, or get started with creating an account!";
+      suggestions = [
+        'What can I do on this platform?',
+        'How do I sign up?',
+        'Tell me about the features',
+        'What is a neighbourhood?'
+      ];
+    } else {
+      welcomeMsg = config.chatbot_config.embedding.welcome_message;
+      suggestions = config.chatbot_config.fallback.suggestions;
+    }
+    
     addMessage('assistant', welcomeMsg, {
-      suggestions: config.chatbot_config.fallback.suggestions,
+      suggestions: suggestions,
       onSuggestionClick: handleSuggestionClick,
     });
-  }, []);
+  }, [isLandingPage]);
 
   // Update API client when token changes
   useEffect(() => {
@@ -374,6 +398,48 @@ const NeighbourBot = ({ jwtToken, apiBase, neighbourhoodId, onNeighbourhoodUpdat
         return;
       }
 
+      // For landing page, check common questions FIRST (before API calls)
+      if (isLandingPage) {
+        const lowerMessage = message.toLowerCase();
+        
+        // Handle common landing page questions
+        if (lowerMessage.includes('what is a neighbourhood') || lowerMessage.includes('what is neighbourhood')) {
+          addMessage('assistant', 'A neighbourhood is a local community area where you can connect with nearby residents. On our platform, you can join a neighbourhood to share updates, discover local businesses, buy/sell items, and stay informed about what\'s happening in your area. Each neighbourhood has its own feed, marketplace, and business directory.', {
+            suggestions: ['How do I sign up?', 'What features are available?', 'Tell me about the marketplace'],
+            onSuggestionClick: handleSuggestionClick,
+          });
+          setIsLoading(false);
+          return;
+        }
+        
+        if (lowerMessage.includes('how do i sign up') || lowerMessage.includes('sign up') || lowerMessage.includes('create account') || lowerMessage.includes('register')) {
+          addMessage('assistant', 'To sign up, click the "Get Started" or "Sign In" button in the top right corner. You\'ll need to provide your email address and create a password. After signing up, you\'ll be asked to select your neighbourhood so you can start connecting with your local community!', {
+            suggestions: ['What is a neighbourhood?', 'What can I do on this platform?', 'Tell me about the features'],
+            onSuggestionClick: handleSuggestionClick,
+          });
+          setIsLoading(false);
+          return;
+        }
+        
+        if (lowerMessage.includes('what can i do') || lowerMessage.includes('features') || lowerMessage.includes('what features')) {
+          addMessage('assistant', 'Our platform offers several features:\n\n• **Community Feed**: Share posts and alerts with your neighbourhood\n• **Marketplace**: Buy and sell items locally\n• **Business Directory**: Discover local businesses and services\n• **Alerts**: Get notified about important neighbourhood updates\n• **Chat**: Connect and communicate with neighbours\n\nAll features are hyper-local, meaning you only see content from your selected neighbourhood!', {
+            suggestions: ['How do I sign up?', 'What is a neighbourhood?', 'Tell me about the marketplace'],
+            onSuggestionClick: handleSuggestionClick,
+          });
+          setIsLoading(false);
+          return;
+        }
+        
+        if (lowerMessage.includes('marketplace') || lowerMessage.includes('buy') || lowerMessage.includes('sell')) {
+          addMessage('assistant', 'The marketplace lets you buy and sell items within your neighbourhood. You can list items with photos, set prices, and browse what others are selling. It\'s a great way to support your local community and find great deals nearby!', {
+            suggestions: ['How do I sign up?', 'What is a neighbourhood?', 'What other features are there?'],
+            onSuggestionClick: handleSuggestionClick,
+          });
+          setIsLoading(false);
+          return;
+        }
+      }
+
       // Try AI service first for intelligent intent recognition
       let result = null;
       let groqResponse = null;
@@ -423,8 +489,9 @@ const NeighbourBot = ({ jwtToken, apiBase, neighbourhoodId, onNeighbourhoodUpdat
           groqResponse = null; // Fallback to rule-based
         }
       }
+      
       // Fallback to client-side Groq if backend not used
-      else if (groqServiceRef.current && groqServiceRef.current.isAvailable) {
+      if (groqServiceRef.current && groqServiceRef.current.isAvailable) {
         try {
           const conversationHistory = contextManagerRef.current.getHistory();
           groqResponse = await groqServiceRef.current.generateResponse(
@@ -433,14 +500,22 @@ const NeighbourBot = ({ jwtToken, apiBase, neighbourhoodId, onNeighbourhoodUpdat
             config.chatbot_config.intents,
             {
               neighbourhoodName: null, // Could be fetched from API if needed
+              isLandingPage: isLandingPage,
             }
           );
           
           // Check if Groq returned an error
           if (groqResponse && groqResponse.error) {
             groqError = groqResponse;
+            const errorMsg = groqResponse.errorMessage || groqResponse.error || 'Unknown error';
+            
+            // Special handling for decommissioned models
+            if (groqResponse.errorType === 'MODEL_DECOMMISSIONED') {
+              console.error('⚠️ Model decommissioned! Please update VITE_GROQ_MODEL in .env to a supported model (e.g., llama-3.3-70b-versatile)');
+            }
+            
             groqResponse = null; // Clear response so we use fallback
-            console.warn('Groq error:', groqResponse.errorMessage);
+            console.warn('Groq error:', errorMsg);
           } else if (groqResponse && groqResponse.intent) {
             // Groq identified an intent
             const intent = config.chatbot_config.intents.find(i => i.name === groqResponse.intent);
@@ -480,10 +555,22 @@ const NeighbourBot = ({ jwtToken, apiBase, neighbourhoodId, onNeighbourhoodUpdat
       // If no intent found, use fallback
       if (!result.intent) {
         let fallbackMsg = config.chatbot_config.fallback.message;
+        let fallbackSuggestions = config.chatbot_config.fallback.suggestions;
         
         // Use Groq response if available and not an error
         if (groqResponse && groqResponse.response && !groqResponse.error) {
           fallbackMsg = groqResponse.response;
+        }
+        
+        // For landing page, provide more helpful fallback
+        if (isLandingPage && !groqResponse?.response) {
+          fallbackMsg = 'I can help you learn about our neighbourhood platform! You can ask me about features, how to sign up, what a neighbourhood is, or anything else about the platform. What would you like to know?';
+          fallbackSuggestions = [
+            'What can I do on this platform?',
+            'How do I sign up?',
+            'What is a neighbourhood?',
+            'Tell me about the features'
+          ];
         }
         
         // Show error message if Groq failed (but don't block the conversation)
@@ -492,7 +579,7 @@ const NeighbourBot = ({ jwtToken, apiBase, neighbourhoodId, onNeighbourhoodUpdat
         }
         
         addMessage('assistant', fallbackMsg, {
-          suggestions: config.chatbot_config.fallback.suggestions,
+          suggestions: fallbackSuggestions,
           onSuggestionClick: handleSuggestionClick,
         });
         return;
