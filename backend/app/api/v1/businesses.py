@@ -114,6 +114,7 @@ async def create_business(
 @router.get("/", response_model=List[BusinessResponse])
 async def get_businesses(
     neighbourhood_id: Optional[str] = Query(None, description="Filter by neighbourhood"),
+    user_id: Optional[str] = Query(None, description="Filter by user"),
     category: Optional[str] = Query(None, description="Filter by category"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0)
@@ -122,6 +123,7 @@ async def get_businesses(
     try:
         businesses = await supabase_service.get_businesses(
             neighbourhood_id=neighbourhood_id,
+            user_id=user_id,
             category=category,
             limit=limit,
             offset=offset

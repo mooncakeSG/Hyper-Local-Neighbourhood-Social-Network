@@ -1,14 +1,80 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useUserStore } from '../store/useUserStore'
 import ImageUploader from './ImageUploader'
+import MentionAutocomplete from './MentionAutocomplete'
+import { getPartialMention } from '../utils/mentions'
+import { showSuccess, showError } from '../utils/toast'
 
 export default function PostComposer({ onClose, onSuccess }) {
   const [content, setContent] = useState('')
   const [type, setType] = useState('post') // 'post' or 'alert'
   const [imageUrl, setImageUrl] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [mentionQuery, setMentionQuery] = useState('')
+  const [showMentionAutocomplete, setShowMentionAutocomplete] = useState(false)
+  const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 })
+  const textareaRef = useRef(null)
   const { user, neighbourhood, session } = useUserStore()
+
+  const handleContentChange = (e) => {
+    const newContent = e.target.value
+    setContent(newContent)
+    
+    // Check for @mentions
+    const cursorPosition = e.target.selectionStart
+    const partialMention = getPartialMention(newContent, cursorPosition)
+    
+    if (partialMention !== null) {
+      setMentionQuery(partialMention)
+      setShowMentionAutocomplete(true)
+      
+      // Calculate position for autocomplete (below textarea)
+      if (textareaRef.current) {
+        const rect = textareaRef.current.getBoundingClientRect()
+        setMentionPosition({
+          top: rect.bottom + 5,
+          left: rect.left
+        })
+      }
+    } else {
+      setShowMentionAutocomplete(false)
+      setMentionQuery('')
+    }
+  }
+
+  const handleMentionSelect = (selectedUser) => {
+    if (!selectedUser) {
+      setShowMentionAutocomplete(false)
+      return
+    }
+    
+    const cursorPosition = textareaRef.current.selectionStart
+    const beforeCursor = content.substring(0, cursorPosition)
+    const afterCursor = content.substring(cursorPosition)
+    
+    // Find the last @ before cursor
+    const lastAtIndex = beforeCursor.lastIndexOf('@')
+    if (lastAtIndex === -1) return
+    
+    // Replace the partial mention with the full mention
+    const beforeMention = content.substring(0, lastAtIndex)
+    const mentionText = `@${selectedUser.name || selectedUser.email}`
+    const newContent = beforeMention + mentionText + ' ' + afterCursor
+    
+    setContent(newContent)
+    setShowMentionAutocomplete(false)
+    setMentionQuery('')
+    
+    // Focus back on textarea and set cursor position
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus()
+        const newCursorPos = beforeMention.length + mentionText.length + 1
+        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos)
+      }
+    }, 0)
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -53,10 +119,14 @@ export default function PostComposer({ onClose, onSuccess }) {
         throw new Error(errorData.detail || 'Failed to create post')
       }
 
+      showSuccess(
+        type === 'alert' ? 'Alert created' : 'Post created',
+        `Your ${type === 'alert' ? 'alert' : 'post'} has been shared with your neighbourhood`
+      )
       onSuccess()
     } catch (err) {
       console.error('Error creating post:', err)
-      alert('Failed to create post: ' + err.message)
+      showError('Failed to create post', err.message)
     } finally {
       setLoading(false)
     }
@@ -115,14 +185,30 @@ export default function PostComposer({ onClose, onSuccess }) {
             </button>
           </div>
 
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="What's happening in your neighbourhood?"
-            className="w-full px-4 py-3 border border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-black resize-none"
-            rows={6}
-            required
-          />
+          <div className="relative">
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={handleContentChange}
+              onKeyDown={(e) => {
+                // Handle Enter to select mention
+                if (showMentionAutocomplete && (e.key === 'Enter' || e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                  e.preventDefault()
+                  // Let MentionAutocomplete handle this
+                }
+              }}
+              placeholder="What's happening in your neighbourhood? Use @ to mention someone"
+              className="w-full px-4 py-3 border border-black rounded-lg focus:outline-none focus:ring-2 focus:ring-black resize-none"
+              rows={6}
+              required
+            />
+            <MentionAutocomplete
+              query={mentionQuery}
+              onSelect={handleMentionSelect}
+              position={mentionPosition}
+              visible={showMentionAutocomplete}
+            />
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-black mb-2">

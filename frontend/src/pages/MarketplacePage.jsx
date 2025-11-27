@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useUserStore } from '../store/useUserStore'
 import MarketplaceItemCard from '../components/MarketplaceItemCard'
 import MarketplaceItemComposer from '../components/MarketplaceItemComposer'
+import MarketplaceItemSkeleton from '../components/skeletons/MarketplaceItemSkeleton'
 
 export default function MarketplacePage() {
   const { neighbourhood, user, session } = useUserStore()
@@ -93,14 +94,26 @@ export default function MarketplacePage() {
       return items
     },
     enabled: !!neighbourhood?.id,
+    refetchInterval: 60 * 1000, // Poll every 60 seconds for new marketplace items
+    refetchIntervalInBackground: true,
   })
 
   const categories = ['all', 'electronics', 'furniture', 'clothing', 'other']
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-black">Loading marketplace...</div>
+      <div className="pb-20">
+        <div className="max-w-2xl mx-auto px-4 py-6">
+          <div className="mb-6">
+            <div className="h-8 bg-gray-200 rounded w-32 mb-2 animate-pulse"></div>
+            <div className="h-4 bg-gray-200 rounded w-48 animate-pulse"></div>
+          </div>
+          <div className="space-y-4">
+            <MarketplaceItemSkeleton />
+            <MarketplaceItemSkeleton />
+            <MarketplaceItemSkeleton />
+          </div>
+        </div>
       </div>
     )
   }

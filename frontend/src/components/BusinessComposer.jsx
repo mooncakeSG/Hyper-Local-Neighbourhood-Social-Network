@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useUserStore } from '../store/useUserStore'
 import ImageUploader from './ImageUploader'
+import { showSuccess, showError } from '../utils/toast'
 
 export default function BusinessComposer({ onClose, onSuccess }) {
   const [name, setName] = useState('')
@@ -74,10 +75,11 @@ export default function BusinessComposer({ onClose, onSuccess }) {
         throw new Error(errorData.detail || 'Failed to create business listing')
       }
 
+      showSuccess('Business listed', 'Your business has been added to the directory')
       onSuccess()
     } catch (err) {
       console.error('Error creating business:', err)
-      alert('Failed to create business: ' + err.message)
+      showError('Failed to create business', err.message)
     } finally {
       setLoading(false)
     }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useUserStore } from '../store/useUserStore'
 import ImageUploader from './ImageUploader'
+import { showSuccess, showError, showWarning } from '../utils/toast'
 
 export default function MarketplaceItemComposer({ onClose, onSuccess }) {
   const [title, setTitle] = useState('')
@@ -27,7 +28,7 @@ export default function MarketplaceItemComposer({ onClose, onSuccess }) {
 
     const priceNum = parseFloat(price)
     if (isNaN(priceNum) || priceNum < 0) {
-      alert('Please enter a valid price')
+      showWarning('Invalid price', 'Please enter a valid price greater than or equal to 0')
       return
     }
 
@@ -80,10 +81,11 @@ export default function MarketplaceItemComposer({ onClose, onSuccess }) {
         throw new Error(errorData.detail || 'Failed to create marketplace item')
       }
 
+      showSuccess('Item listed', 'Your item has been added to the marketplace')
       onSuccess()
     } catch (err) {
       console.error('Error creating marketplace item:', err)
-      alert('Failed to create item: ' + err.message)
+      showError('Failed to create item', err.message)
     } finally {
       setLoading(false)
     }

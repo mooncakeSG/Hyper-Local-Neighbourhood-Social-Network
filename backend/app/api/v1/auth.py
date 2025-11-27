@@ -120,12 +120,17 @@ async def signup(
                 detail="Failed to create user account"
             )
         
+        user = response.user
+        session = response.session
+        
         # Create user record in our users table (use service role for database operations)
+        # Note: phone is required (NOT NULL) in schema, so we generate a unique placeholder
+        import uuid
         user_data = {
             "id": user.id,
             "email": request_data.email,
             "name": request_data.name,
-            "phone": None  # Keep phone column for backward compatibility
+            "phone": f"email-{str(uuid.uuid4())[:8]}"  # Unique placeholder for email-based users
         }
         
         # Insert or update user (use service role key for database operations)
@@ -239,11 +244,13 @@ async def signin(
             logger.warning(f"User {response.user.id} not found in users table, creating basic record")
             
             # Create a basic user record
+            # Note: phone is required (NOT NULL) in schema, so we generate a unique placeholder
+            import uuid
             user_data = {
                 "id": response.user.id,
                 "email": response.user.email,
                 "name": None,
-                "phone": None,
+                "phone": f"email-{str(uuid.uuid4())[:8]}",  # Unique placeholder for email-based users
                 "neighbourhood_id": None
             }
             

@@ -109,6 +109,7 @@ async def create_marketplace_item(
 @router.get("/", response_model=List[MarketplaceItemResponse])
 async def get_marketplace_items(
     neighbourhood_id: Optional[str] = Query(None, description="Filter by neighbourhood"),
+    user_id: Optional[str] = Query(None, description="Filter by user"),
     category: Optional[str] = Query(None, description="Filter by category"),
     status: Optional[str] = Query("available", description="Filter by status"),
     limit: int = Query(50, ge=1, le=200),
@@ -118,6 +119,7 @@ async def get_marketplace_items(
     try:
         items = await supabase_service.get_marketplace_items(
             neighbourhood_id=neighbourhood_id,
+            user_id=user_id,
             category=category,
             status=status,
             limit=limit,

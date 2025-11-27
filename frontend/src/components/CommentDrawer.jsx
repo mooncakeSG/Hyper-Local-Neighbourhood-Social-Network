@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useUserStore } from '../store/useUserStore'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { showSuccess, showError } from '../utils/toast'
+import CommentSkeleton from './skeletons/CommentSkeleton'
 
 export default function CommentDrawer({ postId, onClose, onUpdate }) {
   const [comment, setComment] = useState('')
@@ -51,6 +53,10 @@ export default function CommentDrawer({ postId, onClose, onUpdate }) {
     onSuccess: () => {
       queryClient.invalidateQueries(['comments', postId])
       onUpdate()
+      showSuccess('Comment updated', 'Your comment has been updated')
+    },
+    onError: (error) => {
+      showError('Failed to update comment', error.message)
     }
   })
 
@@ -90,10 +96,15 @@ export default function CommentDrawer({ postId, onClose, onUpdate }) {
       queryClient.invalidateQueries(['comments', postId])
       onUpdate()
       setShowDeleteConfirm(null)
+      showSuccess('Comment deleted', 'Your comment has been removed')
+    },
+    onError: (error) => {
+      showError('Failed to delete comment', error.message)
+      setShowDeleteConfirm(null)
     }
   })
 
-  const { data: comments, refetch } = useQuery({
+  const { data: comments, isLoading: commentsLoading, refetch } = useQuery({
     queryKey: ['comments', postId],
     queryFn: async () => {
       // DEV MODE: Return mock comments
@@ -133,6 +144,8 @@ export default function CommentDrawer({ postId, onClose, onUpdate }) {
       const data = await response.json()
       return data || []
     },
+    refetchInterval: 20 * 1000, // Poll every 20 seconds for new comments
+    refetchIntervalInBackground: false, // Only poll when drawer is open
   })
 
   const handleSubmit = async (e) => {
@@ -178,12 +191,16 @@ export default function CommentDrawer({ postId, onClose, onUpdate }) {
         throw new Error(errorData.detail || 'Failed to create comment')
       }
 
+      // Optimistic update: Clear input and show success immediately
       setComment('')
+      showSuccess('Comment posted', 'Your comment has been added')
+      
+      // Refetch comments to get the new one
       refetch()
       onUpdate()
     } catch (err) {
       console.error('Error creating comment:', err)
-      alert('Failed to post comment: ' + err.message)
+      showError('Failed to post comment', err.message)
     } finally {
       setLoading(false)
     }
@@ -230,7 +247,13 @@ export default function CommentDrawer({ postId, onClose, onUpdate }) {
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-4 mb-4">
-          {comments && comments.length > 0 ? (
+          {commentsLoading ? (
+            <>
+              <CommentSkeleton />
+              <CommentSkeleton />
+              <CommentSkeleton />
+            </>
+          ) : comments && comments.length > 0 ? (
             comments.map((commentItem) => {
               const isOwner = user && commentItem.user_id === user.id
               const isEditing = editingCommentId === commentItem.id

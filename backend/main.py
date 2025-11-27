@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from app.api.v1 import posts, users, notifications, comments, neighbourhoods, upload, marketplace, businesses, auth
+from app.api.v1 import posts, users, notifications, comments, neighbourhoods, upload, marketplace, businesses, auth, likes
 
 # Import middleware
 from app.middleware.error_handler import ErrorHandlerMiddleware
@@ -54,6 +54,7 @@ app.include_router(neighbourhoods.router, prefix="/api/v1/neighbourhoods", tags=
 app.include_router(upload.router, prefix="/api/v1/upload", tags=["upload"])
 app.include_router(marketplace.router, prefix="/api/v1/marketplace", tags=["marketplace"])
 app.include_router(businesses.router, prefix="/api/v1/businesses", tags=["businesses"])
+app.include_router(likes.router, prefix="/api/v1", tags=["likes"])
 
 from app.api.v1 import health as health_api
 

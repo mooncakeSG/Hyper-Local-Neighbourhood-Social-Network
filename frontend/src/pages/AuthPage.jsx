@@ -5,6 +5,7 @@ import { useUserStore } from '../store/useUserStore'
 import { motion } from 'framer-motion'
 import HCaptcha from '@hcaptcha/react-hcaptcha'
 import { setupOneSignalForUser } from '../utils/notifications'
+import { showSuccess, showError, showInfo } from '../utils/toast'
 
 export default function AuthPage() {
   const [email, setEmail] = useState('')
@@ -95,10 +96,15 @@ VITE_HCAPTCHA_SITE_KEY=your_hcaptcha_site_key`}
       }
       setCaptchaToken(null)
 
+      // Show success message
+      showSuccess('Account created', 'Welcome! Please select your neighbourhood')
+      
       // Navigate to neighbourhood selection or feed
       navigate('/select-neighbourhood')
     } catch (err) {
-      setError(err.message || 'Failed to sign up')
+      const errorMessage = err.message || 'Failed to sign up'
+      setError(errorMessage)
+      showError('Sign up failed', errorMessage)
       if (captchaRef && typeof captchaRef.reset === 'function') {
         captchaRef.reset()
       }
@@ -157,6 +163,9 @@ VITE_HCAPTCHA_SITE_KEY=your_hcaptcha_site_key`}
       }
       setCaptchaToken(null)
 
+      // Show success message
+      showSuccess('Welcome back!', 'You have been signed in successfully')
+      
       // Navigate to neighbourhood selection or feed
       if (data.user.neighbourhood_id) {
         navigate('/app')
@@ -164,7 +173,9 @@ VITE_HCAPTCHA_SITE_KEY=your_hcaptcha_site_key`}
         navigate('/select-neighbourhood')
       }
     } catch (err) {
-      setError(err.message || 'Failed to sign in')
+      const errorMessage = err.message || 'Failed to sign in'
+      setError(errorMessage)
+      showError('Sign in failed', errorMessage)
       if (captchaRef && typeof captchaRef.reset === 'function') {
         captchaRef.reset()
       }
@@ -203,7 +214,10 @@ VITE_HCAPTCHA_SITE_KEY=your_hcaptcha_site_key`}
         throw new Error(data.detail || data.error?.message || 'Failed to send reset email')
       }
 
-      alert(data.message || 'If an account with that email exists, a password reset link has been sent.')
+      showInfo(
+        'Password reset email sent',
+        data.message || 'If an account with that email exists, a password reset link has been sent. Please check your inbox.'
+      )
       setStep('signin')
       setEmail('')
       if (captchaRef && typeof captchaRef.reset === 'function') {

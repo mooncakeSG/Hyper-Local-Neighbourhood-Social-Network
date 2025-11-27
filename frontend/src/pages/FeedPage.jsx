@@ -2,11 +2,16 @@ import { useQuery } from '@tanstack/react-query'
 import { useUserStore } from '../store/useUserStore'
 import PostCard from '../components/PostCard'
 import PostComposer from '../components/PostComposer'
-import { useState } from 'react'
+import PostSkeleton from '../components/skeletons/PostSkeleton'
+import { useState, useEffect, useRef } from 'react'
+import { setupPullToRefresh } from '../utils/pullToRefresh'
 
 export default function FeedPage() {
   const { neighbourhood, user, session } = useUserStore()
   const [showComposer, setShowComposer] = useState(false)
+  const [newPostsCount, setNewPostsCount] = useState(0)
+  const feedContainerRef = useRef(null)
+  const lastPostIdRef = useRef(null)
 
   const { data: posts, isLoading, refetch } = useQuery({
     queryKey: ['posts', neighbourhood?.id],
@@ -63,18 +68,66 @@ export default function FeedPage() {
       return data || []
     },
     enabled: !!neighbourhood?.id,
+    refetchInterval: 30 * 1000, // Poll every 30 seconds for new posts
+    refetchIntervalInBackground: true, // Continue polling when tab is in background
   })
+
+  // Track new posts
+  useEffect(() => {
+    if (posts && posts.length > 0) {
+      const firstPostId = posts[0].id
+      
+      // If we have a previous post ID and it's different, we have new posts
+      if (lastPostIdRef.current && lastPostIdRef.current !== firstPostId) {
+        // Count new posts
+        const newPosts = posts.filter(
+          (post, index) => index < posts.findIndex(p => p.id === lastPostIdRef.current)
+        )
+        setNewPostsCount(prev => prev + newPosts.length)
+      }
+      
+      lastPostIdRef.current = firstPostId
+    }
+  }, [posts])
+
+  // Setup pull-to-refresh
+  useEffect(() => {
+    if (!feedContainerRef.current) return
+
+    const cleanup = setupPullToRefresh(feedContainerRef.current, async () => {
+      await refetch()
+      setNewPostsCount(0) // Clear new posts count after refresh
+    })
+
+    return cleanup
+  }, [refetch])
+
+  const handleShowNewPosts = () => {
+    setNewPostsCount(0)
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-black">Loading posts...</div>
+      <div className="pb-20">
+        <div className="max-w-2xl mx-auto px-4 py-6">
+          <div className="mb-6">
+            <div className="h-8 bg-gray-200 rounded w-32 mb-2 animate-pulse"></div>
+            <div className="h-4 bg-gray-200 rounded w-48 animate-pulse"></div>
+          </div>
+          <div className="space-y-4">
+            <PostSkeleton />
+            <PostSkeleton />
+            <PostSkeleton />
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="pb-20">
+    <div className="pb-20" ref={feedContainerRef}>
       <div className="max-w-2xl mx-auto px-4 py-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-black mb-1">
@@ -82,6 +135,21 @@ export default function FeedPage() {
           </h1>
           <p className="text-gray-600 text-sm">Local community updates</p>
         </div>
+
+        {/* New Posts Indicator */}
+        {newPostsCount > 0 && (
+          <div className="mb-4">
+            <button
+              onClick={handleShowNewPosts}
+              className="w-full px-4 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium flex items-center justify-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span>{newPostsCount} new post{newPostsCount > 1 ? 's' : ''} available</span>
+            </button>
+          </div>
+        )}
 
         <div className="space-y-4">
           {posts && posts.length > 0 ? (

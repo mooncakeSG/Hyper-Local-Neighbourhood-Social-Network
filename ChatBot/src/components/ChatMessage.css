@@ -1,0 +1,175 @@
+.chat-message {
+  margin-bottom: 16px;
+  animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chat-message.user {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.chat-message.assistant {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.message-content {
+  max-width: 75%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.chat-message.user .message-content {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.chat-message.assistant .message-content {
+  background-color: #f7f7f7;
+  color: #000000;
+  border: 1px solid #e5e5e5;
+}
+
+.message-timestamp {
+  font-size: 11px;
+  color: #999;
+  margin-top: 4px;
+  padding: 0 8px;
+}
+
+.suggestions {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.suggestion-button {
+  padding: 8px 12px;
+  background-color: #ffffff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.suggestion-button:hover {
+  background-color: #f7f7f7;
+  transform: scale(1.02);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.message-data {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e5e5;
+}
+
+.posts-list,
+.marketplace-list,
+.businesses-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.post-item,
+.marketplace-item,
+.business-item {
+  padding: 12px;
+  background-color: #ffffff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+}
+
+.post-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.alert-badge {
+  background-color: #ff0000;
+  color: #ffffff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.post-content {
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.post-meta {
+  font-size: 12px;
+  color: #999;
+}
+
+.item-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.item-price {
+  color: #000000;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.item-status {
+  font-size: 12px;
+  color: #666;
+  text-transform: capitalize;
+}
+
+.business-name {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.business-category {
+  font-size: 12px;
+  color: #666;
+  text-transform: capitalize;
+  margin-bottom: 4px;
+}
+
+.business-contact {
+  font-size: 12px;
+  color: #999;
+}
+
+.empty-state {
+  padding: 16px;
+  text-align: center;
+  color: #999;
+  font-style: italic;
+}
+
+.data-display {
+  font-family: monospace;
+  font-size: 12px;
+  background-color: #f7f7f7;
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabaseClient'
 import { useUserStore } from '../store/useUserStore'
 import { motion } from 'framer-motion'
+import { showSuccess, showError } from '../utils/toast'
+import { authenticatedFetch } from '../utils/apiClient'
+import NeighbourhoodSelectSkeleton from '../components/skeletons/NeighbourhoodSelectSkeleton'
 
 export default function NeighbourhoodSelectPage() {
   const [neighbourhoods, setNeighbourhoods] = useState([])
@@ -21,37 +23,59 @@ export default function NeighbourhoodSelectPage() {
 
   const fetchNeighbourhoods = async () => {
     try {
+      setLoading(true)
+      
       // In dev mode, provide mock neighbourhoods
       if (user?.id?.startsWith('dev-user-')) {
         setNeighbourhoods([
-          { id: 'dev-neighbourhood-1', name: 'Development Neighbourhood', city: 'Cape Town' },
-          { id: 'dev-neighbourhood-2', name: 'Test Area', city: 'Johannesburg' },
+          { 
+            id: 'dev-neighbourhood-1', 
+            name: 'Development Neighbourhood', 
+            city: 'Cape Town',
+            province: 'Western Cape',
+            latitude: -33.9249,
+            longitude: 18.4241
+          },
+          { 
+            id: 'dev-neighbourhood-2', 
+            name: 'Test Area', 
+            city: 'Johannesburg',
+            province: 'Gauteng',
+            latitude: -26.2041,
+            longitude: 28.0473
+          },
         ])
         setLoading(false)
         return
       }
 
-      // Use backend API instead of direct Supabase query
-      const session = useUserStore.getState().session
-      const accessToken = session?.access_token || user?.session?.access_token
+      // Use backend API - neighbourhoods endpoint doesn't require auth
+      const apiUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/neighbourhoods`
       
-      const headers = {}
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`
-      }
-      
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/neighbourhoods`, {
-        headers
-      })
+      const response = await authenticatedFetch(apiUrl, {}, false) // requireAuth = false
 
       if (!response.ok) {
-        throw new Error('Failed to fetch neighbourhoods')
+        const errorText = await response.text()
+        throw new Error(`Failed to fetch neighbourhoods: ${response.status} - ${errorText}`)
       }
 
       const data = await response.json()
-      setNeighbourhoods(data || [])
+      
+      // Ensure latitude/longitude are numbers if present
+      const formattedData = (data || []).map(n => ({
+        ...n,
+        latitude: n.latitude ? parseFloat(n.latitude) : null,
+        longitude: n.longitude ? parseFloat(n.longitude) : null,
+      }))
+      
+      setNeighbourhoods(formattedData)
+      
+      if (formattedData.length === 0) {
+        showError('No neighbourhoods found', 'Please contact support to add neighbourhoods')
+      }
     } catch (err) {
       console.error('Error fetching neighbourhoods:', err)
+      showError('Failed to load neighbourhoods', err.message || 'Please refresh the page')
       // Fallback to empty array if fetch fails
       setNeighbourhoods([])
     } finally {
@@ -190,46 +214,48 @@ export default function NeighbourhoodSelectPage() {
       if (isDevMode) {
         console.log('🔧 DEV MODE: Bypassing API call, setting neighbourhood directly')
         setNeighbourhood(neighbourhood)
+        showSuccess('Neighbourhood selected', `Welcome to ${neighbourhood.name}!`)
         navigate('/app')
         return
       }
 
       // PRODUCTION: Update user's neighbourhood via backend API
-      const session = useUserStore.getState().session
-      const accessToken = session?.access_token || user?.session?.access_token
+      const apiUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/users/neighbourhood`
       
-      if (!accessToken) {
-        throw new Error('No access token found. Please sign in again.')
-      }
-      
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/users/neighbourhood`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`
+      const response = await authenticatedFetch(
+        apiUrl,
+        {
+          method: 'POST',
+          body: JSON.stringify({ neighbourhood_id: neighbourhood.id })
         },
-        body: JSON.stringify({ neighbourhood_id: neighbourhood.id })
-      })
+        true // requireAuth = true
+      )
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Failed to update neighbourhood')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || `Failed to update neighbourhood: ${response.status}`)
       }
 
+      const updatedUser = await response.json()
+      
+      // Update user store with neighbourhood
       setNeighbourhood(neighbourhood)
+      
+      // Also update user object if it includes neighbourhood_id
+      if (updatedUser && updatedUser.neighbourhood_id) {
+        setUser({ ...user, neighbourhood_id: updatedUser.neighbourhood_id })
+      }
+      
+      showSuccess('Neighbourhood selected', `Welcome to ${neighbourhood.name}!`)
       navigate('/app')
     } catch (err) {
       console.error('Error selecting neighbourhood:', err)
-      alert('Failed to select neighbourhood')
+      showError('Failed to select neighbourhood', err.message || 'Please try again')
     }
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-black">Loading neighbourhoods...</div>
-      </div>
-    )
+    return <NeighbourhoodSelectSkeleton />
   }
 
   const handleDevMode = () => {
@@ -372,9 +398,11 @@ export default function NeighbourhoodSelectPage() {
                 className="w-full text-left p-4 border border-black rounded-lg hover:bg-gray-50 transition-colors"
               >
                 <div className="font-medium text-black">{neighbourhood.name}</div>
-                {neighbourhood.city && (
-                  <div className="text-sm text-gray-600">{neighbourhood.city}</div>
-                )}
+                <div className="text-sm text-gray-600">
+                  {neighbourhood.city && neighbourhood.province 
+                    ? `${neighbourhood.city}, ${neighbourhood.province}`
+                    : neighbourhood.city || neighbourhood.province || 'South Africa'}
+                </div>
               </motion.button>
             ))}
           </div>
