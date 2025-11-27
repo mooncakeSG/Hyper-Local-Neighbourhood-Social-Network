@@ -86,16 +86,16 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-black">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-blue border-b border-black">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-black">Neighbourhood</h1>
+              <h1 className="text-2xl font-bold text-white">Hello Neighbour!</h1>
             </div>
             <div className="flex items-center gap-4">
               <button
                 onClick={() => navigate('/auth')}
-                className="text-black hover:underline text-sm font-medium"
+                className="text-white hover:underline text-sm font-medium"
               >
                 Sign In
               </button>
@@ -120,12 +120,10 @@ export default function LandingPage() {
             className="text-center max-w-4xl mx-auto"
           >
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-black mb-6 leading-tight">
-              Connect with your
-              <br />
-              <span className="underline decoration-4">neighbourhood</span>
+              Connect with your neighbourhood!
             </h1>
             <p className="text-xl sm:text-2xl text-gray-600 mb-8 max-w-2xl mx-auto">
-              Your hyper-local social network. Share updates, discover local businesses, 
+              Welcome to your hyper-local social network. Share updates, discover local businesses, 
               and build a stronger community together.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -133,14 +131,14 @@ export default function LandingPage() {
                 onClick={() => navigate('/auth')}
                 className="px-8 py-4 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-lg font-medium w-full sm:w-auto"
               >
-                Start Your Free Trial
+                Sign Up Free 
               </button>
               <button
                 onClick={() => {
                   const element = document.getElementById('features')
                   element?.scrollIntoView({ behavior: 'smooth' })
                 }}
-                className="px-8 py-4 border-2 border-black text-black rounded-lg hover:bg-black hover:text-white transition-colors text-lg font-medium w-full sm:w-auto"
+                className="px-8 py-4 border-2 border-black text-black rounded-lg hover:bg-gray-800 hover:text-white transition-colors text-lg font-medium w-full sm:w-auto"
               >
                 Watch A Demo
               </button>
