@@ -188,7 +188,16 @@ export default function MarketplaceItemDetails({ itemId, onClose, onUpdate }) {
         className="w-full bg-white rounded-t-2xl p-6 max-h-[90vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-black">Item Details</h2>
+          <button
+            onClick={onClose}
+            className="flex items-center gap-2 text-gray-600 hover:text-black transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back
+          </button>
+          <h2 className="text-xl font-bold text-black flex-1 text-center">Item Details</h2>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-black"
